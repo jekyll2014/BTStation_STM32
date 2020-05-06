@@ -1,0 +1,182 @@
+
+#include <SPI.h>
+
+SPIClass SPITwo(PB15, PB14, PB13);
+
+void setup() {
+  // put your setup code here, to run once:
+  // initialize SPI:
+  SPI.begin();
+  SPITwo.begin();
+}
+
+void loop() {
+  // put your main code here, to run repeatedly:
+
+}
+
+============================
+
+HardwareSerial Serial2(USART2);
+or
+HardwareSerial Serial2(PA3, PA2);
+
+Default I2C is on PB7/PB6 (D2/D3)
+Arduino_Core_STM32/variants/BLUEPILL_F103C8/variant.h
+
+Line 104 in 646fff4
+
+ #define PIN_WIRE_SDA            PB7 
+
+So using Wire instance will use those pin.
+else you can use the second I2C like that:
+TwoWire i2cTwo(PB11, PB10);
+or if you want change the default pin for Wire instance call this before begin():
+Wire.setSCL(PB10);
+Wire.setSDA(PB11);
+Wire.begin();
+For uart/i2c/SPI, this is the same basic usage as Arduino except some API added which has been added for better flexibility. Example the setSDA/SCL. There is some other added for SPI (setMISO,...), serial (setRx,..)
+
+Here I use stm32 pin name PXy but you can also use the pin number Dx or x.
+
+==========================
+
+I've just tested all SPIx available by only changing pins to used thanks setXXX() with the Nucleo F103RB and it's OK.
+To test it, I used the TFTBitmapLogo example.
+By default, SPI instance uses SPI1 without AF (PA7/PA6/PA5)
+Then I've tested SP1 remapped to PB5/PB4/PB3. (warning PB3 is linked to Serial wire JTAG configuration, you have to disable it pinF1_DisconnectDebug(PB_3);
+Then I've tested SPI2 (PB15/PB14/PB13).
+
+SPI pin must be changed before TFTscreen.begin(); which call SPI.begin();
+
+void setup() {
+  /* SPI1 remapped */
+  /*
+  pinF1_DisconnectDebug(PB_3);
+  SPI.setMOSI(PB5);
+  SPI.setMISO(PB4);
+  SPI.setSCLK(PB3);
+  */
+  /* SPI2 */
+  /*
+  SPI.setMOSI(PB15);
+  SPI.setMISO(PB14);
+  SPI.setSCLK(PB13);
+  */
+  // initialize the GLCD and show a message
+  // asking the user to open the serial line
+  TFTscreen.begin();
+
+=========================
+
+The code below works on stm32f103c8t6 blue pill:
+
+void setup() {
+  // Source: https://community.platformio.org/t/pio-arduino-stm32f103cbt6-remap/6786/5
+  afio_cfg_debug_ports(AFIO_DEBUG_SW_ONLY); // PB3 free
+  afio_remap(AFIO_REMAP_SPI1);
+
+  gpio_set_mode (GPIOB, 3, GPIO_AF_OUTPUT_PP);
+  gpio_set_mode (GPIOB, 4, GPIO_INPUT_FLOATING);
+  gpio_set_mode (GPIOB, 5, GPIO_AF_OUTPUT_PP);
+
+// put your setup code here, to run once:
+
+}
+
+void loop() {
+  // put your main code here, to run repeatedly:
+
+}
+Example:
+
+/**
+    SPI_1 and SPI_2 port example code
+
+    Description:
+    This sketch sends one byte with value 0x55 over the SPI_1 or SPI_2 port.
+    The received byte (the answer from the SPI slave device) is stored to the <data> variable.
+
+    The sketch as it is, works with SPI_1 port. For using the SPI_2 port, just
+    un-comment all the nessesary code lines marked with <SPI_2> word.
+
+    Created on 10 Jun 2015 by Vassilis Serasidis
+    email:  avrsite@yahoo.gr
+
+    Using the first SPI port (SPI_1)
+    SS    <-->  PA4 <-->  BOARD_SPI1_NSS_PIN
+    SCK   <-->  PA5 <-->  BOARD_SPI1_SCK_PIN
+    MISO  <-->  PA6 <-->  BOARD_SPI1_MISO_PIN
+    MOSI  <-->  PA7 <-->  BOARD_SPI1_MOSI_PIN
+
+    Using the first SPI port (SPI_1) REMAPPED
+    SS    <-->  PA15 <-->  BOARD_SPI1_NSS_PIN
+    SCK   <-->  PB3 <-->  BOARD_SPI1_SCK_PIN
+    MISO  <-->  PB4 <-->  BOARD_SPI1_MISO_PIN
+    MOSI  <-->  PB5 <-->  BOARD_SPI1_MOSI_PIN
+
+    Using the second SPI port (SPI_2)
+    SS    <-->  PB12 <-->  BOARD_SPI2_NSS_PIN
+    SCK   <-->  PB13 <-->  BOARD_SPI2_SCK_PIN
+    MISO  <-->  PB14 <-->  BOARD_SPI2_MISO_PIN
+    MOSI  <-->  PB15 <-->  BOARD_SPI2_MOSI_PIN
+*/
+
+
+#include <SPI.h>
+
+#define SPI1_NSS_PIN PA15 //PA4    //SPI_1 Chip Select pin is PA4. You can change it to the STM32 pin you want.
+#define SPI2_NSS_PIN PB12   //SPI_2 Chip Select pin is PB12. You can change it to the STM32 pin you want.
+
+SPIClass SPI_2(2); //Create an instance of the SPI Class called SPI_2 that uses the 2nd SPI Port
+byte data;
+
+void setup() {
+  // Remap SPI 1
+  // Source: https://community.platformio.org/t/pio-arduino-stm32f103cbt6-remap/6786/5
+  afio_cfg_debug_ports(AFIO_DEBUG_SW_ONLY); // PB3 free
+  afio_remap(AFIO_REMAP_SPI1);
+
+  gpio_set_mode (GPIOB, 3, GPIO_AF_OUTPUT_PP);
+  gpio_set_mode (GPIOB, 4, GPIO_INPUT_FLOATING);
+  gpio_set_mode (GPIOB, 5, GPIO_AF_OUTPUT_PP);
+  
+  // Setup SPI 1
+  SPI.begin(); //Initialize the SPI_1 port.
+  SPI.setBitOrder(MSBFIRST); // Set the SPI_1 bit order
+  SPI.setDataMode(SPI_MODE0); //Set the  SPI_2 data mode 0
+  SPI.setClockDivider(SPI_CLOCK_DIV16);      // Slow speed (72 / 16 = 4.5 MHz SPI_1 speed)
+  pinMode(SPI1_NSS_PIN, OUTPUT);
+
+  // Setup SPI 2
+  SPI_2.begin(); //Initialize the SPI_2 port.
+  SPI_2.setBitOrder(MSBFIRST); // Set the SPI_2 bit order
+  SPI_2.setDataMode(SPI_MODE0); //Set the  SPI_2 data mode 0
+  SPI_2.setClockDivider(SPI_CLOCK_DIV16);  // Use a different speed to SPI 1
+  pinMode(SPI2_NSS_PIN, OUTPUT);
+
+
+}
+
+void loop() {
+
+  sendSPI();
+  sendSPI2();
+
+  delayMicroseconds(10);    //Delay 10 micro seconds.
+}
+
+void sendSPI()
+{
+  digitalWrite(SPI1_NSS_PIN, LOW); // manually take CSN low for SPI_1 transmission
+  data = SPI.transfer(0x55); //Send the HEX data 0x55 over SPI-1 port and store the received byte to the <data> variable.
+  digitalWrite(SPI1_NSS_PIN, HIGH); // manually take CSN high between spi transmissions
+}
+
+
+void sendSPI2()
+{
+  digitalWrite(SPI2_NSS_PIN, LOW); // manually take CSN low for SPI_2 transmission
+  data = SPI_2.transfer(0x55); //Send the HEX data 0x55 over SPI-2 port and store the received byte to the <data> variable.
+  digitalWrite(SPI2_NSS_PIN, HIGH); // manually take CSN high between spi transmissions
+}
